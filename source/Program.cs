@@ -32,7 +32,7 @@ namespace regentropyscanner
             Console.WriteLine(Environment.NewLine + "reg-entropy-scanner v" + assemblyName.Version.ToString(3) + Environment.NewLine);
 
             options = new Options();
-            if (CommandLine.Parser.Default.ParseArguments(args, options) == false)
+            if (CommandLineParser.Default.ParseArguments(args, options) == false)
             {
                 return;
             }
@@ -120,7 +120,7 @@ namespace regentropyscanner
         {
             try
             {
-                var registryHive = new RegistryHive(filePath);
+                var registryHive = new Registry.RegistryHive(filePath);
                 registryHive.RecoverDeleted = true;
                 if (registryHive.ParseHive() == false)
                 {
