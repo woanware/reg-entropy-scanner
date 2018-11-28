@@ -104,8 +104,8 @@ namespace regentropyscanner
 
             fclp.Setup(arg => arg.MinLength)
                 .As('m')
-                .SetDefault(10)
-                .WithDescription("Minimum length of data (defaults to 10)");
+                .SetDefault(20)
+                .WithDescription("Minimum length of data (defaults to 20)");
 
             var header =
                $"{Assembly.GetExecutingAssembly().GetName().Name} v{Assembly.GetExecutingAssembly().GetName().Version.ToString(3)}" +
