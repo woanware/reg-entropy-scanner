@@ -1,23 +1,33 @@
-﻿using Registry;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using CsvHelper;
 using static Registry.Cells.VkCellRecord;
-using System.IO;
-using CommandLine;
 using System.Text.RegularExpressions;
 using System.Reflection;
 using Registry.Other;
+using Fclp;
+using System.IO;
 
 namespace regentropyscanner
-{  
+{
+    /// <summary>
+    /// 
+    /// </summary>
+    internal class ApplicationArguments
+    {
+        public int MinLength { get; set; }
+        public string Output { get; set; }
+        public string Input { get; set; }
+        public bool Dump { get; set; }
+    }
+
     /// <summary>
     /// 
     /// </summary>
     class Program
     {
         #region Member Variables
-        private static Options options;
+        private static FluentCommandLineParser<ApplicationArguments> fclp;
         #endregion
 
         /// <summary>
@@ -26,20 +36,17 @@ namespace regentropyscanner
         /// <param name="args"></param>
         static void Main(string[] args)
         {
-            Assembly assembly = Assembly.GetExecutingAssembly();
-            AssemblyName assemblyName = assembly.GetName();
-
-            Console.WriteLine(Environment.NewLine + "reg-entropy-scanner v" + assemblyName.Version.ToString(3) + Environment.NewLine);
-
-            options = new Options();
-            if (CommandLineParser.Default.ParseArguments(args, options) == false)
+            if (ProcessCommandLine(args) == false)
             {
                 return;
             }
 
-            CheckCommandLine();
+            if (CheckCommandLine() == false)
+            {
+                return;
+            }
 
-            using (FileStream fileStream = new FileStream(Path.Combine(options.Output, "reg-entropy-scanner.tsv"), FileMode.Create, FileAccess.Write))
+            using (FileStream fileStream = new FileStream(Path.Combine(fclp.Object.Output, "reg-entropy-scanner.tsv"), FileMode.Create, FileAccess.Write))
             using (StreamWriter streamWriter = new StreamWriter(fileStream))
             using (CsvWriter cw = new CsvHelper.CsvWriter(streamWriter))
             {
@@ -55,10 +62,10 @@ namespace regentropyscanner
                 cw.WriteField("Data (ASCII)");
                 cw.NextRecord();
 
-                FileAttributes fa = File.GetAttributes(options.Input);
+                FileAttributes fa = File.GetAttributes(fclp.Object.Input);
                 if ((fa & FileAttributes.Directory) == FileAttributes.Directory)
                 {
-                    DirectoryInfo d = new DirectoryInfo(options.Input);
+                    DirectoryInfo d = new DirectoryInfo(fclp.Object.Input);
                     foreach (var file in d.GetFiles("*"))
                     {
                         ProcessFile(cw, file.FullName);
@@ -66,9 +73,62 @@ namespace regentropyscanner
                 }
                 else
                 {
-                    ProcessFile(cw, options.Input);
+                    ProcessFile(cw, fclp.Object.Input);
                 }               
             }          
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private static bool ProcessCommandLine(string[] args)
+        {
+            fclp = new FluentCommandLineParser<ApplicationArguments>
+            {
+                IsCaseSensitive = false
+            };
+
+            fclp.Setup(arg => arg.Input)
+               .As('i')
+               .Required()
+               .WithDescription("Input file or folder to process");
+
+            fclp.Setup(arg => arg.Output)
+                .As('o')
+                .Required()
+                .WithDescription("Output directory for analysis results");
+
+            fclp.Setup(arg => arg.MinLength)
+                .As('m')
+                .SetDefault(10)
+                .WithDescription("Minimum length of data (defaults to 10)");
+
+            var header =
+               $"{Assembly.GetExecutingAssembly().GetName().Name} v{Assembly.GetExecutingAssembly().GetName().Version.ToString(3)}" +
+               "\r\n\r\nAuthor: Mark Woan / woanware (markwoan@gmail.com)" +
+               "\r\nhttps://github.com/woanware/reg-entropy-scanner";        
+
+            // Sets up the parser to execute the callback when -? or --help is supplied
+            fclp.SetupHelp("?", "help")
+                .WithHeader(header)
+                .Callback(text => Console.WriteLine(text));
+
+            var result = fclp.Parse(args);
+
+            if (result.HelpCalled)
+            {
+                return false;
+            }
+
+            if (result.HasErrors)
+            {
+                Console.WriteLine("");
+                Console.WriteLine(result.ErrorText);
+                fclp.HelpOption.ShowHelp(fclp.Options);
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -77,16 +137,10 @@ namespace regentropyscanner
         /// <returns></returns>
         private static bool CheckCommandLine()
         {
-            if (options.Input.Length == 0)
-            {
-                Console.WriteLine("Input parameter (-i) not supplied (file or directory)");
-                return false;
-            }
-
-            FileAttributes fa = File.GetAttributes(options.Input);
+            FileAttributes fa = File.GetAttributes(fclp.Object.Input);
             if ((fa & FileAttributes.Directory) == FileAttributes.Directory)
             {
-                if (Directory.Exists(options.Input) == false)
+                if (Directory.Exists(fclp.Object.Input) == false)
                 {
                     Console.WriteLine("Input directory (-i) does not exist");
                     return false;
@@ -94,17 +148,16 @@ namespace regentropyscanner
             }
             else
             {
-                if (File.Exists(options.Input) == false)
+                if (File.Exists(fclp.Object.Input) == false)
                 {
                     Console.WriteLine("Input file (-i) does not exist");
                     return false;
                 }
-            }
-                
+            }               
 
-            if (options.Output.Length == 0)
+            if (Directory.Exists(fclp.Object.Output) == false)
             {
-                Console.WriteLine("Output parameter (-o) not supplied (file or directory)");
+                Console.WriteLine("Output directory (-o) does not exist");
                 return false;
             }
 
@@ -168,7 +221,7 @@ namespace regentropyscanner
                         continue;
                 }
 
-                if (val.ValueDataRaw.Length < 100)
+                if (val.ValueDataRaw.Length < fclp.Object.MinLength)
                 {
                     continue;
                 }
@@ -209,7 +262,7 @@ namespace regentropyscanner
             try
             {
                 Guid g = Guid.NewGuid();
-                File.WriteAllBytes(Path.Combine(options.Output, fileName + g.ToString() + ".bin"), data);
+                File.WriteAllBytes(Path.Combine(fclp.Object.Output, fileName + g.ToString() + ".bin"), data);
                 cw.WriteField(fileName + "-" + g.ToString() + ".bin");
             }
             catch (Exception ex)
