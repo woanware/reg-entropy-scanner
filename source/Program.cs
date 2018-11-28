@@ -7,6 +7,7 @@ using System.Reflection;
 using Registry.Other;
 using Fclp;
 using System.IO;
+using System.Linq;
 
 namespace regentropyscanner
 {
@@ -57,6 +58,9 @@ namespace regentropyscanner
                 cw.WriteField("ValueName");
                 cw.WriteField("ValueType");
                 cw.WriteField("Entropy");
+                cw.WriteField("Entropy (8 byte TLV)");
+                cw.WriteField("Entropy (16 byte TLV)");
+                cw.WriteField("Entropy (32 byte TLV)");
                 cw.WriteField("Bin File");
                 cw.WriteField("Data");
                 cw.WriteField("Data (ASCII)");
@@ -231,6 +235,9 @@ namespace regentropyscanner
                 cw.WriteField(val.ValueName);
                 cw.WriteField(val.ValueType);
                 cw.WriteField(EntropyShannon(val.ValueDataRaw));
+                cw.WriteField(EntropyShannon(val.ValueDataRaw.Skip(8).ToArray<byte>()));
+                cw.WriteField(EntropyShannon(val.ValueDataRaw.Skip(16).ToArray<byte>()));
+                cw.WriteField(EntropyShannon(val.ValueDataRaw.Skip(32).ToArray<byte>()));
 
                 if (val.VkRecord.DataType != DataTypeEnum.RegSz)
                 {                  
@@ -257,6 +264,12 @@ namespace regentropyscanner
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="cw"></param>
+        /// <param name="fileName"></param>
+        /// <param name="data"></param>
         private static void WriteFile(CsvWriter cw, string fileName, byte[] data)
         {
             try
@@ -307,7 +320,6 @@ namespace regentropyscanner
                 ientr -= prop * (float)Math.Log(prop, logbase);
             }
 
-            //Console.WriteLine("Entropy: " + ientr);
             return ientr;
         }
 
